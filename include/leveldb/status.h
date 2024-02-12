@@ -10,6 +10,8 @@
 // non-const method, all threads accessing the same Status must use
 // external synchronization.
 
+//用于记录leveldb中状态信息，保存错误码和对应的字符串错误信息(不过不支持自定义)。其基本组成有三个部分：消息长度，整型code+具体的消息内容
+
 #ifndef STORAGE_LEVELDB_INCLUDE_STATUS_H_
 #define STORAGE_LEVELDB_INCLUDE_STATUS_H_
 
