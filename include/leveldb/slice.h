@@ -12,6 +12,12 @@
 // non-const method, all threads accessing the same Slice must use
 // external synchronization.
 
+//slice
+//slice是leveldb中自定义的字符串处理类，主要是因为标准库中的string，
+//- 默认语意为拷贝，会损失性能(在可预期的条件下，指针传递即可)
+//- 标准库不支持remove_prefix和starts_
+
+
 #ifndef STORAGE_LEVELDB_INCLUDE_SLICE_H_
 #define STORAGE_LEVELDB_INCLUDE_SLICE_H_
 
@@ -67,6 +73,7 @@ class LEVELDB_EXPORT Slice {
   // Drop the first "n" bytes from this slice.
   void remove_prefix(size_t n) {
     assert(n <= size());
+    //data是地址，所以直接+n
     data_ += n;
     size_ -= n;
   }
@@ -86,10 +93,12 @@ class LEVELDB_EXPORT Slice {
   }
 
  private:
+  //数据地址与大小
   const char* data_;
   size_t size_;
 };
 
+//memcmp (const void *__s1, const void *__s2, size_t __n)
 inline bool operator==(const Slice& x, const Slice& y) {
   return ((x.size() == y.size()) &&
           (memcmp(x.data(), y.data(), x.size()) == 0));

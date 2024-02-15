@@ -27,12 +27,14 @@
 //
 // ... prev vs. next pointer ordering ...
 
+//跳表实现
+
 #include <atomic>
 #include <cassert>
 #include <cstdlib>
 
-#include "util/arena.h"
-#include "util/random.h"
+#include "../util/arena.h"
+#include "../util/random.h"
 
 namespace leveldb {
 
@@ -255,9 +257,9 @@ bool SkipList<Key, Comparator>::KeyIsAfterNode(const Key& key, Node* n) const {
   return (n != nullptr) && (compare_(n->key, key) < 0);
 }
 
+//注意template和typename的使用，返回一个SkipList<Key, Comparator>::Node*类型变量
 template <typename Key, class Comparator>
-typename SkipList<Key, Comparator>::Node*
-SkipList<Key, Comparator>::FindGreaterOrEqual(const Key& key,
+typename SkipList<Key, Comparator>::Node* SkipList<Key, Comparator>::FindGreaterOrEqual(const Key& key,
                                               Node** prev) const {
   Node* x = head_;
   int level = GetMaxHeight() - 1;
@@ -279,8 +281,7 @@ SkipList<Key, Comparator>::FindGreaterOrEqual(const Key& key,
 }
 
 template <typename Key, class Comparator>
-typename SkipList<Key, Comparator>::Node*
-SkipList<Key, Comparator>::FindLessThan(const Key& key) const {
+typename SkipList<Key, Comparator>::Node* SkipList<Key, Comparator>::FindLessThan(const Key& key) const {
   Node* x = head_;
   int level = GetMaxHeight() - 1;
   while (true) {
