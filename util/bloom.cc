@@ -41,6 +41,15 @@ class BloomFilterPolicy : public FilterPolicy {
     dst->push_back(static_cast<char>(k_));  // Remember # of probes in filter
     char* array = &(*dst)[init_size];
     for (int i = 0; i < n; i++) {
+      //BloomFilter理论是通过多个hash计算来减少冲突，
+      //double-hashing的方式来达到同样的效果。
+      //double-hashing的理论如下：
+      //1、计算hash值；
+      //2、hash值的高15位，低17位对调
+      //3、按k_个数来存储当前hash值。
+      //3-1、计算存储位置；
+      //3-2、按bit存；
+      //3-3、累加hash值用于下次计算
       // Use double-hashing to generate a sequence of hash values.
       // See analysis in [Kirsch,Mitzenmacher 2006].
       uint32_t h = BloomHash(keys[i]);
@@ -80,8 +89,8 @@ class BloomFilterPolicy : public FilterPolicy {
   }
 
  private:
-  size_t bits_per_key_;
-  size_t k_;
+  size_t bits_per_key_;      //一个key占多少位
+  size_t k_;     //hash函数的个数
 };
 }  // namespace
 
