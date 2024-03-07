@@ -13,6 +13,7 @@
 
 namespace leveldb {
 
+//在im/memtable组件中，会有大量内存创建(数据持续put)和释放(dump到磁盘后内存结束)
 class Arena {
  public:
   Arena();
