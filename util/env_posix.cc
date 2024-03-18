@@ -290,6 +290,7 @@ class PosixWritableFile final : public WritableFile {
     }
   }
 
+  //尽可能的copy到buffer就返回，因为WriteUnbuffered是一个同步操作。
   Status Append(const Slice& data) override {
     size_t write_size = data.size();
     const char* write_data = data.data();
@@ -456,11 +457,11 @@ class PosixWritableFile final : public WritableFile {
 
   // buf_[0, pos_ - 1] contains data to be written to fd_.
   char buf_[kWritableFileBufferSize];
-  size_t pos_;
-  int fd_;
+  size_t pos_;      //buf_当前已经使用的字节位置
+  int fd_;          //当前文件，对应的fd
 
   const bool is_manifest_;  // True if the file's name starts with MANIFEST.
-  const std::string filename_;
+  const std::string filename_; 
   const std::string dirname_;  // The directory of filename_.
 };
 
@@ -515,6 +516,7 @@ class PosixLockTable {
   std::set<std::string> locked_files_ GUARDED_BY(mu_);
 };
 
+//封装了posix标准下所有接口
 class PosixEnv : public Env {
  public:
   PosixEnv();

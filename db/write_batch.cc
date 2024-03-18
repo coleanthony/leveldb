@@ -45,6 +45,7 @@ Status WriteBatch::Iterate(Handler* handler) const {
     return Status::Corruption("malformed WriteBatch (too small)");
   }
 
+  //删除header
   input.remove_prefix(kHeader);
   Slice key, value;
   int found = 0;
@@ -52,6 +53,7 @@ Status WriteBatch::Iterate(Handler* handler) const {
     found++;
     char tag = input[0];
     input.remove_prefix(1);
+    //取出后删除
     switch (tag) {
       case kTypeValue:
         if (GetLengthPrefixedSlice(&input, &key) &&

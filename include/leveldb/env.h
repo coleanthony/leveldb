@@ -48,6 +48,9 @@ class SequentialFile;
 class Slice;
 class WritableFile;
 
+//leveldb是跨平台的，因此Env封装了跨平台的内容
+//该类就是一个纯虚类
+//Status表示函数执行状态，而实际生成的对象是在函数的第二个参数，现代C++不建议这样操作
 class LEVELDB_EXPORT Env {
  public:
   Env();

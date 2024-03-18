@@ -367,6 +367,7 @@ bool LockOrUnlock(HANDLE handle, bool lock) {
   }
 }
 
+//封装了win相关接口
 class WindowsFileLock : public FileLock {
  public:
   WindowsFileLock(ScopedHandle handle, std::string filename)
