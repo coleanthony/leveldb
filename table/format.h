@@ -66,8 +66,8 @@ class Footer {
   Status DecodeFrom(Slice* input);
 
  private:
-  BlockHandle metaindex_handle_;
-  BlockHandle index_handle_;
+  BlockHandle metaindex_handle_;           // MetaIndexBlock的文件偏移量和长度  
+  BlockHandle index_handle_;               // IndexBlock的文件偏移量和长度  
 };
 
 // kTableMagicNumber was picked by running

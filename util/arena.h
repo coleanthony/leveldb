@@ -13,6 +13,8 @@
 
 namespace leveldb {
 
+///---Kblocksize---/---kblocksize---/used/unused///
+
 //在im/memtable组件中，会有大量内存创建(数据持续put)和释放(dump到磁盘后内存结束)
 class Arena {
  public:
@@ -21,6 +23,7 @@ class Arena {
   Arena(const Arena&) = delete;
   Arena& operator=(const Arena&) = delete;
 
+  //when memtable releases, arena will release it's buffer pool
   ~Arena();
 
   // Return a pointer to a newly allocated memory block of "bytes" bytes.
@@ -36,20 +39,26 @@ class Arena {
   }
 
  private:
+  //allocate the memory on demand, may waste some recourses
   char* AllocateFallback(size_t bytes);
   char* AllocateNewBlock(size_t block_bytes);
 
   // Allocation state
+  // 当前已使用的内存指针
   char* alloc_ptr_;
+
+  //剩余内存字节数
   size_t alloc_bytes_remaining_;
 
   // Array of new[] allocated memory blocks
+  // 实际分配的内存池
   std::vector<char*> blocks_;
 
   // Total memory usage of the arena.
   //
   // TODO(costan): This member is accessed via atomics, but the others are
   //               accessed without any locking. Is this OK?
+  //记录内存使用的情况
   std::atomic<size_t> memory_usage_;
 };
 
@@ -57,6 +66,8 @@ inline char* Arena::Allocate(size_t bytes) {
   // The semantics of what to return are a bit messy if we allow
   // 0-byte allocations, so we disallow them here (we don't need
   // them for our internal use).
+
+  //don't use assert, use static_assert
   assert(bytes > 0);
   if (bytes <= alloc_bytes_remaining_) {
     char* result = alloc_ptr_;

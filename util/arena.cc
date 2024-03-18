@@ -21,11 +21,13 @@ char* Arena::AllocateFallback(size_t bytes) {
   if (bytes > kBlockSize / 4) {
     // Object is more than a quarter of our block size.  Allocate it separately
     // to avoid wasting too much space in leftover bytes.
+    //大于剩余字节数, 且大于1/4，额外分配，搭配一起使用
     char* result = AllocateNewBlock(bytes);
     return result;
   }
 
   // We waste the remaining space in the current block.
+  //否则直接新分配一个块，原先的直接丢弃
   alloc_ptr_ = AllocateNewBlock(kBlockSize);
   alloc_bytes_remaining_ = kBlockSize;
 
@@ -39,6 +41,8 @@ char* Arena::AllocateAligned(size_t bytes) {
   const int align = (sizeof(void*) > 8) ? sizeof(void*) : 8;
   static_assert((align & (align - 1)) == 0,
                 "Pointer size should be a power of 2");
+
+  //使用位运算替代取模，计算当前字节是否对齐
   size_t current_mod = reinterpret_cast<uintptr_t>(alloc_ptr_) & (align - 1);
   size_t slop = (current_mod == 0 ? 0 : align - current_mod);
   size_t needed = bytes + slop;
