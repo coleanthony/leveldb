@@ -40,13 +40,15 @@ namespace {
 
 // An entry is a variable length heap-allocated structure.  Entries
 // are kept in a circular doubly linked list ordered by access time.
+
+//LRUHandle这个类主要是用于自定义的hashtable和lru中节点。
 struct LRUHandle {
-  void* value;
-  void (*deleter)(const Slice&, void* value);
-  LRUHandle* next_hash;
-  LRUHandle* next;
+  void* value;            
+  void (*deleter)(const Slice&, void* value);  //自定义回收节点的回调函数
+  LRUHandle* next_hash;   //用于hashtable冲突时，下一个节点
+  LRUHandle* next;        //LRU双向链表 next prev
   LRUHandle* prev;
-  size_t charge;  // TODO(opt): Only allow uint32_t?
+  size_t charge;  // TODO(opt): Only allow uint32_t?     记录当前lru双向链表占用内存大小
   size_t key_length;
   bool in_cache;     // Whether entry is in the cache.
   uint32_t refs;     // References, including cache reference, if present.
@@ -62,16 +64,23 @@ struct LRUHandle {
   }
 };
 
+//在leveldb中作者实现了自己的一个hash表，相比标准库而言，去除了移植性，而且要比gcc4.4.3中内置的随机取快5%。
 // We provide our own simple hash table since it removes a whole bunch
 // of porting hacks and is also faster than some of the built-in hash
 // table implementations in some of the compiler/runtime combinations
 // we have tested.  E.g., readrandom speeds up by ~5% over the g++
 // 4.4.3's builtin hashtable.
+
+//特点
+//1.默认大小是0，如果元素个数少于4时，哈希表按照元素个数来分配呢欧村；大于等于4时，则按照2的倍数对齐
+//2.对冲突采用链式地址法
+//3.rehash是实际当元素个数大于链表长度时
 class HandleTable {
  public:
   HandleTable() : length_(0), elems_(0), list_(nullptr) { Resize(); }
   ~HandleTable() { delete[] list_; }
 
+  //查找某个key
   LRUHandle* Lookup(const Slice& key, uint32_t hash) {
     return *FindPointer(key, hash);
   }
@@ -105,13 +114,14 @@ class HandleTable {
  private:
   // The table consists of an array of buckets where each bucket is
   // a linked list of cache entries that hash into the bucket.
-  uint32_t length_;
-  uint32_t elems_;
-  LRUHandle** list_;
+  uint32_t length_;      //hash表总长度
+  uint32_t elems_;       //当前hash表实际元素个数
+  LRUHandle** list_;     //存储实际数据
 
   // Return a pointer to slot that points to a cache entry that
   // matches key/hash.  If there is no such cache entry, return a
   // pointer to the trailing slot in the corresponding linked list.
+  //用来定位元素所在节点
   LRUHandle** FindPointer(const Slice& key, uint32_t hash) {
     LRUHandle** ptr = &list_[hash & (length_ - 1)];
     while (*ptr != nullptr && ((*ptr)->hash != hash || key != (*ptr)->key())) {
@@ -120,6 +130,7 @@ class HandleTable {
     return ptr;
   }
 
+  //链表扩容
   void Resize() {
     uint32_t new_length = 4;
     while (new_length < elems_) {
@@ -148,6 +159,14 @@ class HandleTable {
 };
 
 // A single shard of sharded cache.
+//注意：
+//1.LRU中的元素可能不仅仅只在cache中，有可能会被外部所引用，因此我们不能直接删除节点
+//2.如果某个节点被修改/被其他引用，在空间不足时候，也不能参与lru的计算
+//3.in_use表示既在缓存中，也在外面被引用
+//4.lru_.next表示仅仅在缓存中而已
+//5.table_是为了记录key和节点的映射关系，通过key可以快速定位到某个节点
+//6.调用Insert/LookUp之后，一定要使用Release来释放句柄
+
 class LRUCache {
  public:
   LRUCache();
@@ -163,7 +182,7 @@ class LRUCache {
   Cache::Handle* Lookup(const Slice& key, uint32_t hash);
   void Release(Cache::Handle* handle);
   void Erase(const Slice& key, uint32_t hash);
-  void Prune();
+  void Prune();   //手动检测是否有需要删除的节点，发生在节点超过容量之后
   size_t TotalCharge() const {
     MutexLock l(&mutex_);
     return usage_;
@@ -172,8 +191,8 @@ class LRUCache {
  private:
   void LRU_Remove(LRUHandle* e);
   void LRU_Append(LRUHandle* list, LRUHandle* e);
-  void Ref(LRUHandle* e);
-  void Unref(LRUHandle* e);
+  void Ref(LRUHandle* e);     //增加引用
+  void Unref(LRUHandle* e);     //节点引用等于0 ，才能调用free函数 ,否则只能移动，No longer in use; move to lru_ list    
   bool FinishErase(LRUHandle* e) EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   // Initialized before use.
@@ -181,18 +200,18 @@ class LRUCache {
 
   // mutex_ protects the following state.
   mutable port::Mutex mutex_;
-  size_t usage_ GUARDED_BY(mutex_);
+  size_t usage_ GUARDED_BY(mutex_);  //获取当前LRUCache已经使用的内存
 
   // Dummy head of LRU list.
   // lru.prev is newest entry, lru.next is oldest entry.
   // Entries have refs==1 and in_cache==true.
-  LRUHandle lru_ GUARDED_BY(mutex_);
+  LRUHandle lru_ GUARDED_BY(mutex_);    //只存在缓存中的节点
 
   // Dummy head of in-use list.
   // Entries are in use by clients, and have refs >= 2 and in_cache==true.
-  LRUHandle in_use_ GUARDED_BY(mutex_);
+  LRUHandle in_use_ GUARDED_BY(mutex_);   //既存在缓存中，又被外部引用的节点
 
-  HandleTable table_ GUARDED_BY(mutex_);
+  HandleTable table_ GUARDED_BY(mutex_);  //用于快速获取某个节点
 };
 
 LRUCache::LRUCache() : capacity_(0), usage_(0) {
@@ -270,6 +289,7 @@ Cache::Handle* LRUCache::Insert(const Slice& key, uint32_t hash, void* value,
                                                 void* value)) {
   MutexLock l(&mutex_);
 
+  //创建节点对象
   LRUHandle* e =
       reinterpret_cast<LRUHandle*>(malloc(sizeof(LRUHandle) - 1 + key.size()));
   e->value = value;
@@ -281,6 +301,7 @@ Cache::Handle* LRUCache::Insert(const Slice& key, uint32_t hash, void* value,
   e->refs = 1;  // for the returned handle.
   std::memcpy(e->key_data, key.data(), key.size());
 
+  //容量大于0开启缓存模式
   if (capacity_ > 0) {
     e->refs++;  // for the cache's reference.
     e->in_cache = true;

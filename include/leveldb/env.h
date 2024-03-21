@@ -222,6 +222,7 @@ class LEVELDB_EXPORT Env {
 };
 
 // A file abstraction for reading sequentially through a file
+// 顺序读取的抽象
 class LEVELDB_EXPORT SequentialFile {
  public:
   SequentialFile() = default;
@@ -251,10 +252,11 @@ class LEVELDB_EXPORT SequentialFile {
   virtual Status Skip(uint64_t n) = 0;
 };
 
+// RandomAccessFile用于随机读取文件内容的文件抽象。线程安全。
 // A file abstraction for randomly reading the contents of a file.
 class LEVELDB_EXPORT RandomAccessFile {
  public:
-  RandomAccessFile() = default;
+  File() = default;
 
   RandomAccessFile(const RandomAccessFile&) = delete;
   RandomAccessFile& operator=(const RandomAccessFile&) = delete;
@@ -293,6 +295,7 @@ class LEVELDB_EXPORT WritableFile {
 };
 
 // An interface for writing log messages.
+// 主要是记录一些错误信息，是个纯虚基类。
 class LEVELDB_EXPORT Logger {
  public:
   Logger() = default;
@@ -307,6 +310,7 @@ class LEVELDB_EXPORT Logger {
 };
 
 // Identifies a locked file.
+//一个基类，作为接口的设计
 class LEVELDB_EXPORT FileLock {
  public:
   FileLock() = default;

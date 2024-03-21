@@ -48,6 +48,12 @@ namespace port {
 class CondVar;
 
 // Thinly wraps std::mutex.
+//RAII的思想
+//确保能运行资源释放代码的地方就是在这个程序段（栈帧）中放置的对象的析构函数了
+//将初始化和资源释放都移动到一个包装类中的好处：
+//- 保证了资源的正常释放
+//- 省去了在异常处理中冗长而重复甚至有些还不一定执行到的清理逻辑，进而确保了代码的异常安全。
+
 class LOCKABLE Mutex {
  public:
   Mutex() = default;

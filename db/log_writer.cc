@@ -31,6 +31,7 @@ Writer::Writer(WritableFile* dest, uint64_t dest_length)
 
 Writer::~Writer() = default;
 
+//写入wal日志
 Status Writer::AddRecord(const Slice& slice) {
   const char* ptr = slice.data();
   size_t left = slice.size();
@@ -43,6 +44,7 @@ Status Writer::AddRecord(const Slice& slice) {
   do {
     const int leftover = kBlockSize - block_offset_;
     assert(leftover >= 0);
+    //小于HeaderSize，重启一个新的block
     if (leftover < kHeaderSize) {
       // Switch to a new block
       if (leftover > 0) {
@@ -50,6 +52,7 @@ Status Writer::AddRecord(const Slice& slice) {
         static_assert(kHeaderSize == 7, "");
         dest_->Append(Slice("\x00\x00\x00\x00\x00\x00", leftover));
       }
+      //重启一个新的block
       block_offset_ = 0;
     }
 
@@ -61,14 +64,15 @@ Status Writer::AddRecord(const Slice& slice) {
 
     RecordType type;
     const bool end = (left == fragment_length);
-    if (begin && end) {
+    //计算是否刚好填满这个block
+    if (begin && end) { //新block刚好装下
       type = kFullType;
-    } else if (begin) {
+    } else if (begin) { //新block，但是一个又装不下
       type = kFirstType;
-    } else if (end) {
+    } else if (end) { //上一份数据到本block，结束了
       type = kLastType;
     } else {
-      type = kMiddleType;
+      type = kMiddleType; //其他场景
     }
 
     s = EmitPhysicalRecord(type, ptr, fragment_length);
@@ -86,6 +90,7 @@ Status Writer::EmitPhysicalRecord(RecordType t, const char* ptr,
 
   // Format the header
   char buf[kHeaderSize];
+  //序列化长度和recordtype等信息
   buf[4] = static_cast<char>(length & 0xff);
   buf[5] = static_cast<char>(length >> 8);
   buf[6] = static_cast<char>(t);

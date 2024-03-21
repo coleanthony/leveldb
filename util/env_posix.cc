@@ -70,6 +70,9 @@ Status PosixError(const std::string& context, int error_number) {
 // Currently used to limit read-only file descriptors and mmap file usage
 // so that we do not run out of file descriptors or virtual memory, or run into
 // kernel performance problems for very large databases.
+// 1. Helper 类限制资源使用，避免耗尽。目前用于限制只读文件描述符和 mmap 文件使用，这样我们就不会用完文件描述符或虚拟内存，或者遇到非常大的数据库的内核性能问题。
+// 2. 使用atomic原子变量，所以线程安全
+
 class Limiter {
  public:
   // Limit maximum number of resources to |max_acquires|.
@@ -244,6 +247,14 @@ class PosixMmapReadableFile final : public RandomAccessFile {
   // |mmap_limiter| must outlive this instance. The caller must have already
   // acquired the right to use one mmap region, which will be released when this
   // instance is destroyed.
+
+  //1. mmap()函数可以把一个文件或者Posix共享内存对象映射到调用进程的地址空间。映射分为两种。
+  // 文件映射：文件映射将一个文件的一部分直接映射到调用进程的虚拟内存中。
+  // 一旦一个文件被映射之后就可以通过在相应的内存区域中操作字节来访问文件内容了。
+  // 映射的分页会在需要的时候从文件中（自动）加载。这种映射也被称为基于文件的映射或内存映射文件。
+  // 匿名映射：一个匿名映射没有对应的文件。相反，这种映射的分页会被初始化为 0。
+  //2. mmap()系统调用在调用进程的虚拟地址空间中创建一个新映射。
+
   PosixMmapReadableFile(std::string filename, char* mmap_base, size_t length,
                         Limiter* mmap_limiter)
       : mmap_base_(mmap_base),
@@ -675,11 +686,13 @@ class PosixEnv : public Env {
       return PosixError("lock " + filename, lock_errno);
     }
 
+    //记录他的fd和文件名
     *lock = new PosixFileLock(fd, filename);
     return Status::OK();
   }
 
   Status UnlockFile(FileLock* lock) override {
+    //解锁的时候方便将fd和文件名拿出
     PosixFileLock* posix_file_lock = static_cast<PosixFileLock*>(lock);
     if (LockOrUnlock(posix_file_lock->fd(), false) == -1) {
       return PosixError("unlock " + posix_file_lock->filename(), errno);
@@ -813,6 +826,7 @@ PosixEnv::PosixEnv()
       mmap_limiter_(MaxMmaps()),
       fd_limiter_(MaxOpenFiles()) {}
 
+//env中的线程池
 void PosixEnv::Schedule(
     void (*background_work_function)(void* background_work_arg),
     void* background_work_arg) {
@@ -826,6 +840,7 @@ void PosixEnv::Schedule(
   }
 
   // If the queue is empty, the background thread may be waiting for work.
+  //线程池空，需要等待工作完成
   if (background_work_queue_.empty()) {
     background_work_cv_.Signal();
   }
@@ -834,6 +849,7 @@ void PosixEnv::Schedule(
   background_work_mutex_.Unlock();
 }
 
+//回调函数
 void PosixEnv::BackgroundThreadMain() {
   while (true) {
     background_work_mutex_.Lock();
